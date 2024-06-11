@@ -117,10 +117,21 @@ app.get('/login', async (req, res) => {
             usernameFound = false;
             }
         }
+        
         // Redirect user to the game page if account exists
         if(usernameFound === true) {
-            // return res.redirect("http://localhost:3000/homepage");
+          let findPassword = await db.oneOrNone('SELECT password FROM testlogin WHERE username = $1', req.query.username )
+          if(findPassword.password == req.query.password) {
             res.json("loggedin")
+            // console.log("worked");
+          }
+          else {
+            res.json("wrong password")
+            // console.log("password in database", findPassword.password);
+            // console.log("password input", req.query.password);
+          }
+            // return res.redirect("http://localhost:3000/homepage");
+            
 
             
         }
@@ -149,6 +160,7 @@ Body parameters:
 */
 
 app.post('/register', async function(req, res) {
+    console.log(req.body);
     let formData = await db.manyOrNone('SELECT * FROM testlogin');
     // console.log(formData);
     if(Object.keys(req.query).length > 0) {
@@ -179,7 +191,8 @@ app.post('/register', async function(req, res) {
           // const firstName = await bcrypt.hash(req.body.firstName, 10);
           // const lastName = await bcrypt.hash(req.body.lastName, 10);
   
-          await db.none('INSERT INTO testlogin(username, password) VALUES($1, $2)', [req.body.username, req.body.password]);
+          await db.none('INSERT INTO logininfo(email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, req.body.password, req.body.username, req.body.firstname, req.body.lastname]);
+          // console.log(req.body.firstname)
           // alert("Successfully signed up!");
           // return res.redirect("");
           res.json("user registered")
