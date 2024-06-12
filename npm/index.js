@@ -120,7 +120,9 @@ app.get('/login', async (req, res) => {
         
         // Redirect user to the game page if account exists
         if(usernameFound === true) {
+          // take the hashed password from the logininfo database
           let storedHashedPass = await db.oneOrNone('SELECT password FROM logininfo WHERE username = $1', req.query.username)
+          // compare the hashed password with the password entered in during login
           let comparePass = bcrypt.compareSync(req.query.password, storedHashedPass.password)
             if(comparePass == true) {
               res.json("loggedin")
@@ -183,9 +185,11 @@ app.post('/register', async function(req, res) {
         }
         else if(userExist === false) {
           let password = req.body.password;
+          // take the password from the body and salt it 10 times
           bcrypt.hash(password, saltRounds)
           .then(hash => {
             console.log(`Hash: ${hash}`);
+            // take the hashed password and store it into the logininfo database
             db.none('INSERT INTO logininfo (email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, hash, req.body.username, req.body.firstname, req.body.lastname]);
           })
           .catch(err => console.error(err.message));
