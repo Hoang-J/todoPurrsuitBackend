@@ -74,7 +74,7 @@ app.all('/*', (req, res, next) => {
 
 
 app.get('/', async (req, res) => {
-  res.json("deploy check");
+  res.send("deploy check");
 })
 
 
