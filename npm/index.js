@@ -19,6 +19,7 @@ app.use(bodyParser.json());
 
 // code to use pg-promise
 const pgp = require('pg-promise')();
+// using elephantSQL to make it easier between team members to access the database
 const db = pgp("postgres://tlfinihp:d6pjYPQkXxUBwASmDSV5bnmzpr8uXviv@raja.db.elephantsql.com/tlfinihp");
 
 // code to use winston (error logging)
@@ -82,15 +83,15 @@ app.all('/*', (req, res, next) => {
 */
 
 /*
-Endpoint:
-    
+Endpoint: 
+    GET: returns a list of users and the information they provided on the registration page; users can also log into their account by providing 2 query params (their username and password)
 Query Parameters:
-  
+    username[string]: username created by user on registration
+    password[string]: password provided by user on registration
 */
 
 app.get('/login', async (req, res) => {
-  // console.log("get endpoint called");
-    let formData = await db.manyOrNone('SELECT * FROM testlogin');
+    let formData = await db.manyOrNone('SELECT * FROM logininfo');
     // Makes sure that there are no body parameters at this GET endpoint
     if(Object.keys(req.body).length != 0) {
         clientError(req, "Request body is not permitted at this endpoint", 400);
@@ -102,12 +103,15 @@ app.get('/login', async (req, res) => {
         res.status(400).json({error: "Query parameters do not meet the requirements length"});
     } 
     else{
+        // return the entire list of users if a username query is not provided
         if(req.query.username == undefined) {
           res.json(formData);
         }
+        // when a user provides a username aka when logging in on the login page, will go through the code in the conditional below
         else if(req.query.username != undefined){
+        // declaring a global variable for later access
         let usernameFound;
-        // Checking if the username exists
+        // Checking if the username exists in the database
         for(let i = 0; i < formData.length; i++) {
             if(formData[i].username == req.query.username) {
             usernameFound = true;
@@ -117,23 +121,23 @@ app.get('/login', async (req, res) => {
             usernameFound = false;
             }
         }
-        
-        // Redirect user to the game page if account exists
+        // once the username is found, will go through the conditionals below to match the password for each respective accounts
         if(usernameFound === true) {
-          let findPassword = await db.oneOrNone('SELECT password FROM testlogin WHERE username = $1', req.query.username )
-          if(findPassword.password == req.query.password) {
-            res.json("loggedin")
-            // console.log("worked");
-          }
-          else {
-            res.json("wrong password")
-            // console.log("password in database", findPassword.password);
-            // console.log("password input", req.query.password);
-          }
-            // return res.redirect("http://localhost:3000/homepage");
-            
+          // retrieving the stored hashed password inside the database
+          let storedHashedPass = await db.oneOrNone('SELECT password FROM logininfo WHERE username = $1', req.query.username)
+          // using a bcrypt method to compare the stored hashed password with what the user provided as the password on login screen
+          // using async method because it works better on a server because of the amount of information being exchanged
+          let comparePass = bcrypt.compareSync(req.query.password, storedHashedPass.password)
+          // bcrypt.compareSync will return a boolean (true or false)
+            if(comparePass == true) {
+              res.json("loggedin")
+            }
+            else {
+              // return res.redirect("http://localhost:3000/homepage");
+              res.json("wrong password")
+            }
 
-            
+          
         }
         // Redirect user to the registration page if account does not exists
         else if(usernameFound === false) {
@@ -144,25 +148,26 @@ app.get('/login', async (req, res) => {
   }
 });
 
-
-
 /* 
 -------------------------------------------------------------------------------------------------------------------
                                                  POST ENDPOINTS
 -------------------------------------------------------------------------------------------------------------------
 */
-
 /*
-Endpoint:
-  Adds the new user information to the logins database
-Body parameters:
-
+Endpoint: 
+    POST: creates a new user account 
+Body:
+    username[string](required): username of user to be added into the database
+    password[string](required): password of the user to be added into the database
+    email[string](required): email of the user to be added into the database
+    firstname[string](required): firstname of the user to be added into the database
+    lastname[string](required): lastname of the user to be added into the database
 */
 
 app.post('/register', async function(req, res) {
-    console.log(req.body);
-    let formData = await db.manyOrNone('SELECT * FROM testlogin');
-    // console.log(formData);
+    // retrieving the list of user accounts and storing it in a global variable for later access
+    let formData = await db.manyOrNone('SELECT * FROM logininfo');
+    // this endpoint should not have any query params since it is POST
     if(Object.keys(req.query).length > 0) {
       clientError(req, "Query not permitted at this endpoint", 400);
       res.status(400).json({error: "Query not permitted at this endpoint"});
@@ -170,8 +175,8 @@ app.post('/register', async function(req, res) {
     else{
       if(req.body != undefined){
         let userExist;
-        // console.log(req.body.username);
-        // console.log(formData[0].username);
+        // looping through the account list stored inside the formData variable 
+        // checking if there is already an account that exists with the username provided
         for(let i = 0; i < formData.length; i++) {
           if(formData[i].username == req.body.username) {
             userExist = true;
@@ -186,24 +191,27 @@ app.post('/register', async function(req, res) {
           res.json("user exists")
         }
         else if(userExist === false) {
-          // const password = await bcrypt.hash(req.body.password, 10);
-          // const email = await bcrypt.hash(req.body.email, 10);
-          // const firstName = await bcrypt.hash(req.body.firstName, 10);
-          // const lastName = await bcrypt.hash(req.body.lastName, 10);
-  
-          await db.none('INSERT INTO logininfo(email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, req.body.password, req.body.username, req.body.firstname, req.body.lastname]);
-          // console.log(req.body.firstname)
-          // alert("Successfully signed up!");
-          // return res.redirect("");
+          // if username does not exist in the database yet, will create a new account with the information user provided and store it inside the database
+          // using bcrypt to hash personal information such as the password for security sake
+
+          // hashing or scrambling random pieces of data 10 times?
+          const saltRounds = 10;
+          let password = req.body.password;
+          bcrypt.hash(password, saltRounds)
+          .then(hash => {
+            // console.log(`Hash: ${hash}`);
+
+            // inserting the user information provided on the registration page into the logininfo database where all user account info is stored
+            // the password is stored as a hash value
+            db.none('INSERT INTO logininfo (email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, hash, req.body.username, req.body.firstname, req.body.lastname]);
+          })
+          .catch(err => console.error(err.message));
+
           res.json("user registered")
         }
-    
       } 
     }
-  
   });
-
-
 
 // ----------------------------------------------SCOREBOARD SERVER ------------------------------------------------
 
@@ -280,6 +288,7 @@ Body:
     username[string](required): username of player to be added
     score[number](required): score the player earned in the game
 */
+
 app.post('/score', async (req, res) => {
   if((!req.body|| typeof(req.body) !== 'object') || (!'username' in req.body || typeof(req.body.username) !== 'string') || (!'score' in req.body || typeof(req.body.score) !== 'number')){
       res.statusCode = 400
