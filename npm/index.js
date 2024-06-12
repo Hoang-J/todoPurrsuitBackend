@@ -90,7 +90,7 @@ Query Parameters:
 
 app.get('/login', async (req, res) => {
   // console.log("get endpoint called");
-    let formData = await db.manyOrNone('SELECT * FROM testlogin');
+    let formData = await db.manyOrNone('SELECT * FROM logininfo');
     // Makes sure that there are no body parameters at this GET endpoint
     if(Object.keys(req.body).length != 0) {
         clientError(req, "Request body is not permitted at this endpoint", 400);
@@ -120,20 +120,15 @@ app.get('/login', async (req, res) => {
         
         // Redirect user to the game page if account exists
         if(usernameFound === true) {
-          let findPassword = await db.oneOrNone('SELECT password FROM testlogin WHERE username = $1', req.query.username )
-          if(findPassword.password == req.query.password) {
-            res.json("loggedin")
-            // console.log("worked");
-          }
-          else {
-            res.json("wrong password")
-            // console.log("password in database", findPassword.password);
-            // console.log("password input", req.query.password);
-          }
-            // return res.redirect("http://localhost:3000/homepage");
-            
-
-            
+          let storedHashedPass = await db.oneOrNone('SELECT password FROM logininfo WHERE username = $1', req.query.username)
+          let comparePass = bcrypt.compareSync(req.query.password, storedHashedPass.password)
+            if(comparePass == true) {
+              res.json("loggedin")
+            }
+            else {
+              res.json("wrong password")
+            }
+              // return res.redirect("http://localhost:3000/homepage");
         }
         // Redirect user to the registration page if account does not exists
         else if(usernameFound === false) {
@@ -158,6 +153,7 @@ Endpoint:
 Body parameters:
 
 */
+const saltRounds = 10;
 
 app.post('/register', async function(req, res) {
     console.log(req.body);
@@ -186,12 +182,14 @@ app.post('/register', async function(req, res) {
           res.json("user exists")
         }
         else if(userExist === false) {
-          // const password = await bcrypt.hash(req.body.password, 10);
-          // const email = await bcrypt.hash(req.body.email, 10);
-          // const firstName = await bcrypt.hash(req.body.firstName, 10);
-          // const lastName = await bcrypt.hash(req.body.lastName, 10);
+          let password = req.body.password;
+          bcrypt.hash(password, saltRounds)
+          .then(hash => {
+            console.log(`Hash: ${hash}`);
+            db.none('INSERT INTO logininfo (email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, hash, req.body.username, req.body.firstname, req.body.lastname]);
+          })
+          .catch(err => console.error(err.message));
   
-          await db.none('INSERT INTO logininfo(email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, req.body.password, req.body.username, req.body.firstname, req.body.lastname]);
           // console.log(req.body.firstname)
           // alert("Successfully signed up!");
           // return res.redirect("");
