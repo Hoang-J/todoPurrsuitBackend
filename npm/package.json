@@ -4,7 +4,7 @@
   "description": "Backend servers for our final project",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon index.js && psql postgres://tlfinihp:d6pjYPQkXxUBwASmDSV5bnmzpr8uXviv@raja.db.elephantsql.com/tlfinihp"
+    "start": "nodemon ./api/index.js && psql postgres://tlfinihp:d6pjYPQkXxUBwASmDSV5bnmzpr8uXviv@raja.db.elephantsql.com/tlfinihp"
   },
   "author": "Justin, Nick, Joel, Jessie",
   "license": "ISC",
