@@ -123,9 +123,9 @@ app.get('/login', async (req, res) => {
         }
         // once the username is found, will go through the conditionals below to match the password for each respective accounts
         if(usernameFound === true) {
-          // retrieving the stored hashed password inside the database
+          // retrieving the stored hashed password from the logininfo database
           let storedHashedPass = await db.oneOrNone('SELECT password FROM logininfo WHERE username = $1', req.query.username)
-          // using a bcrypt method to compare the stored hashed password with what the user provided as the password on login screen
+          // compare the hashed password with the password entered in during login
           // using async method because it works better on a server because of the amount of information being exchanged
           let comparePass = bcrypt.compareSync(req.query.password, storedHashedPass.password)
           // bcrypt.compareSync will return a boolean (true or false)
@@ -193,20 +193,20 @@ app.post('/register', async function(req, res) {
         else if(userExist === false) {
           // if username does not exist in the database yet, will create a new account with the information user provided and store it inside the database
           // using bcrypt to hash personal information such as the password for security sake
-
-          // hashing or scrambling random pieces of data 10 times?
-          const saltRounds = 10;
-          let password = req.body.password;
-          bcrypt.hash(password, saltRounds)
-          .then(hash => {
-            // console.log(`Hash: ${hash}`);
-
-            // inserting the user information provided on the registration page into the logininfo database where all user account info is stored
-            // the password is stored as a hash value
-            db.none('INSERT INTO logininfo (email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, hash, req.body.username, req.body.firstname, req.body.lastname]);
+            const saltRounds = 10;
+            let password = req.body.password;
+            // take the password from the body and salt it 10 times
+            bcrypt.hash(password, saltRounds)
+            .then(hash => {
+              // inserting the user information provided on the registration page into the logininfo database
+              // take the hashed password and store it into the logininfo database
+              db.none('INSERT INTO logininfo (email, password, username, firstname, lastname) VALUES($1, $2, $3, $4, $5)', [req.body.email, hash, req.body.username, req.body.firstname, req.body.lastname]);
           })
           .catch(err => console.error(err.message));
-
+  
+          // console.log(req.body.firstname)
+          // alert("Successfully signed up!");
+          // return res.redirect("");
           res.json("user registered")
         }
       } 
